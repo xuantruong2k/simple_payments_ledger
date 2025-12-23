@@ -84,7 +84,7 @@ Content-Type: application/json
 
 {
   "id": "ACC001",
-  "initialBalance": 1000.50  # Optional, defaults to 0
+  "initial_balance": 1000.50  # Optional, defaults to 0
 }
 
 # Response (201 Created)
@@ -111,8 +111,41 @@ GET /accounts/{account_id}
 }
 ```
 
+#### Transfer Money
+```bash
+POST /transactions
+Content-Type: application/json
+
+{
+  "from_account_id": "ACC001",
+  "to_account_id": "ACC002",
+  "amount": 300.00
+}
+
+# Response (200 OK)
+{
+  "from_account_id": "ACC001",
+  "to_account_id": "ACC002",
+  "amount": 300.00,
+  "from_account_balance": 700.50,
+  "to_account_balance": 1300.00
+}
+
+# Error Response (400 Bad Request - Insufficient Funds)
+{
+  "error": "INSUFFICIENT_FUNDS",
+  "message": "Insufficient funds in account: ACC001"
+}
+```
+
+### Transfer Logic
+The transfer function ensures:
+- **Atomic operations**: Both debit and credit succeed or fail together (using synchronized method)
+- **No negative balances**: Sender must have sufficient funds before transfer
+- **Validation**: All fields are validated (account IDs exist, amount > 0, different accounts)
+
 ### Error Responses
-- `400 BAD_REQUEST` - Invalid input data
+- `400 BAD_REQUEST` - Invalid input data, insufficient funds
 - `404 NOT_FOUND` - Account not found
 - `409 CONFLICT` - Account already exists
 - `500 INTERNAL_ERROR` - Server error
