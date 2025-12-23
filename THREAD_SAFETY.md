@@ -10,8 +10,8 @@ This document provides a comprehensive analysis of thread-safety across the enti
 
 | Component | Thread-Safety Status | Mechanism |
 |-----------|---------------------|-----------|
-| Account Creation | ✅ Thread-Safe | Global creation lock |
-| Account Update | ✅ Thread-Safe | Per-account lock |
+| Account Creation | ✅ Thread-Safe | Per-account lock (fine-grained) |
+| Account Update | ✅ Thread-Safe | Per-account lock (fine-grained) |
 | Balance Add | ✅ Thread-Safe | Atomic read-modify-write under lock |
 | Money Transfer | ✅ Thread-Safe | Fine-grained locking with lock ordering |
 | Repository | ✅ Thread-Safe | ConcurrentHashMap + saveAll() atomicity |
@@ -29,12 +29,11 @@ if (repository.existsById(id)) {  // Thread 1 & 2 both read: false
 repository.save(account);  // Both try to create → 2 accounts!
 ```
 
-**Solution: Global Creation Lock**
+**Solution: Per-Account Lock (Fine-Grained)**
 ```java
-private final ReentrantLock creationLock = new ReentrantLock();
-
 public Account createAccount(String id, BigDecimal initialBalance) {
-    creationLock.lock();
+    ReentrantLock lock = lockManager.getLock(id);  // Lock for THIS account ID only
+    lock.lock();
     try {
         if (accountRepository.existsById(id)) {
             throw new IllegalStateException("Already exists");
@@ -42,19 +41,28 @@ public Account createAccount(String id, BigDecimal initialBalance) {
         Account account = new Account(id, initialBalance);
         return accountRepository.save(account);
     } finally {
-        creationLock.unlock();
+        lock.unlock();
     }
 }
 ```
 
-**Why Global Lock?**
-- Account IDs are unique across the system
-- Creation is infrequent compared to transfers
-- Simple and correct
+**Why Per-Account Lock (Not Global)?**
+- Creating different accounts (ACC001, ACC002) happens **in parallel** ✅
+- Only serializes when creating the **same** account ID
+- No global bottleneck for account creation
+- Scales perfectly with concurrent account creations
+- Same locking strategy as all other operations (consistent)
+
+**Example:**
+```
+Thread 1: createAccount("ACC001") → Gets lock for "ACC001"
+Thread 2: createAccount("ACC002") → Gets lock for "ACC002" (runs in parallel!)
+Thread 3: createAccount("ACC001") → Waits for "ACC001" lock, then gets "already exists"
+```
 
 **Test Coverage:**
 - `testConcurrentCreateAccountWithSameId()` - 10 threads, only 1 succeeds
-- `testConcurrentCreateDifferentAccounts()` - 100 threads, all succeed
+- `testConcurrentCreateDifferentAccounts()` - 100 threads, all succeed **in parallel**
 
 ---
 
@@ -227,22 +235,26 @@ public void saveAll(Account... accounts) {
 ## Lock Hierarchy
 
 ```
-Global Level:
-  └─ creationLock (AccountService)
-      Used for: Account creation
-      Scope: Entire system
+ALL operations use fine-grained per-account locking:
+
+AccountLockManager:
+  └─ accountLocks (ConcurrentHashMap<String, ReentrantLock>)
+      Used for: Account creation, balance updates, transfers
+      Scope: Individual account IDs
+      Ordering: Alphabetical by account ID (for multi-account ops)
       
-Per-Account Level:
-  └─ accountLocks (AccountLockManager)
-      Used for: Balance updates, transfers
-      Scope: Individual accounts
-      Ordering: Alphabetical by account ID
+Operation Examples:
+  - createAccount("ACC001") → Locks "ACC001" only
+  - createAccount("ACC002") → Locks "ACC002" only (parallel with above!)
+  - updateBalance("ACC001") → Locks "ACC001" only
+  - transfer("ACC001", "ACC002") → Locks both in alphabetical order
 ```
 
 **Why This Works:**
-1. No lock overlap between creation and updates
-2. Per-account locks scale with number of accounts
-3. Lock ordering prevents circular waits
+1. **No global bottleneck** - Operations on different accounts are fully parallel
+2. **Per-account locks scale** linearly with number of accounts
+3. **Lock ordering prevents deadlocks** in multi-account operations (transfers)
+4. **Consistent strategy** - All operations use the same locking mechanism
 
 ---
 
