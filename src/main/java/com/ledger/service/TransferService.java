@@ -1,5 +1,6 @@
 package com.ledger.service;
 
+import com.ledger.locking.AccountLockManager;
 import com.ledger.middleware.*;
 import com.ledger.model.Account;
 import com.ledger.repository.AccountRepository;
@@ -12,13 +13,16 @@ import java.util.List;
 
 /**
  * Service for handling money transfers between accounts.
- * Uses a middleware pattern to allow easy extension with additional features
- * like transaction fees, logging, fraud detection, etc.
+ * Uses a middleware pattern with fine-grained locking for scalability.
+ * Supports 100K+ concurrent users without global lock bottleneck.
  */
 public class TransferService {
     private final TransferExecutor transferExecutor;
+    private final AccountLockManager lockManager;
 
     public TransferService(AccountRepository accountRepository) {
+        this.lockManager = new AccountLockManager();
+        
         // Configure the middleware chain
         // Order matters: validation → loading → fee calculation → funds check → execution
         List<TransferMiddleware> middlewares = Arrays.asList(
@@ -28,26 +32,38 @@ public class TransferService {
             new SufficientFundsMiddleware()
         );
 
-        this.transferExecutor = new TransferExecutor(accountRepository, middlewares);
+        this.transferExecutor = new TransferExecutor(accountRepository, middlewares, lockManager);
     }
 
     /**
      * Constructor with custom middleware chain for testing or custom configurations.
      */
     public TransferService(AccountRepository accountRepository, List<TransferMiddleware> middlewares) {
-        this.transferExecutor = new TransferExecutor(accountRepository, middlewares);
+        this.lockManager = new AccountLockManager();
+        this.transferExecutor = new TransferExecutor(accountRepository, middlewares, lockManager);
+    }
+
+    /**
+     * Constructor with custom lock manager (for testing).
+     */
+    public TransferService(AccountRepository accountRepository, 
+                          List<TransferMiddleware> middlewares,
+                          AccountLockManager lockManager) {
+        this.lockManager = lockManager;
+        this.transferExecutor = new TransferExecutor(accountRepository, middlewares, lockManager);
     }
 
     /**
      * Transfer money from one account to another.
-     * The transfer goes through the configured middleware chain.
+     * Uses fine-grained locking - only locks the two involved accounts.
+     * No global synchronization - supports high concurrency.
      *
      * @param fromAccountId Source account ID
      * @param toAccountId Destination account ID
      * @param amount Amount to transfer
      * @return TransferResult containing updated accounts and transfer details
      */
-    public synchronized TransferResult transfer(String fromAccountId, String toAccountId, BigDecimal amount) {
+    public TransferResult transfer(String fromAccountId, String toAccountId, BigDecimal amount) {
         try {
             TransferContext context = new TransferContext(fromAccountId, toAccountId, amount);
             TransferExecutor.TransferResult executorResult = transferExecutor.execute(context);
@@ -64,6 +80,13 @@ public class TransferService {
             }
             throw new RuntimeException("Transfer failed", e);
         }
+    }
+
+    /**
+     * Get the lock manager (for monitoring/debugging).
+     */
+    public AccountLockManager getLockManager() {
+        return lockManager;
     }
 
     /**

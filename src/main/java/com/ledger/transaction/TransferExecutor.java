@@ -1,5 +1,6 @@
 package com.ledger.transaction;
 
+import com.ledger.locking.AccountLockManager;
 import com.ledger.middleware.TransferMiddleware;
 import com.ledger.repository.AccountRepository;
 
@@ -8,34 +9,50 @@ import java.util.List;
 
 /**
  * Executor that processes a transfer through a chain of middleware
- * and executes the final transfer operation.
+ * and executes the final transfer operation with fine-grained locking.
  */
 public class TransferExecutor {
     private final List<TransferMiddleware> middlewares;
     private final AccountRepository accountRepository;
+    private final AccountLockManager lockManager;
 
-    public TransferExecutor(AccountRepository accountRepository, List<TransferMiddleware> middlewares) {
+    public TransferExecutor(AccountRepository accountRepository, 
+                          List<TransferMiddleware> middlewares,
+                          AccountLockManager lockManager) {
         this.accountRepository = accountRepository;
         this.middlewares = new ArrayList<>(middlewares);
+        this.lockManager = lockManager;
     }
 
     /**
      * Execute the transfer with all middleware processing.
+     * Uses fine-grained locking with lock ordering to prevent deadlocks.
      */
     public TransferResult execute(TransferContext context) throws Exception {
-        // Build middleware chain
-        Runnable chain = buildChain(context, 0);
-        
-        // Execute the chain
-        chain.run();
-        
-        // Return result
-        return new TransferResult(
-            context.getFromAccount(),
-            context.getToAccount(),
-            context.getEffectiveAmount(),
-            context.getFee()
+        // Acquire locks in deterministic order (prevents deadlocks)
+        AccountLockManager.LockPair lockPair = lockManager.acquireLocks(
+            context.getFromAccountId(),
+            context.getToAccountId()
         );
+
+        try {
+            // Build middleware chain
+            Runnable chain = buildChain(context, 0);
+            
+            // Execute the chain
+            chain.run();
+            
+            // Return result
+            return new TransferResult(
+                context.getFromAccount(),
+                context.getToAccount(),
+                context.getEffectiveAmount(),
+                context.getFee()
+            );
+        } finally {
+            // Always release locks, even if exception occurs
+            lockManager.releaseLocks(lockPair);
+        }
     }
 
     /**
@@ -65,6 +82,7 @@ public class TransferExecutor {
     /**
      * Execute the actual transfer operation (core business logic).
      * This is called after all middleware have processed.
+     * Protected by fine-grained locks acquired in execute().
      */
     private void executeTransfer(TransferContext context) {
         // Debit sender (amount + fee)
