@@ -320,31 +320,90 @@ transferService.transfer(fromId, toId, amount);
 TransferService customService = new TransferService(repository, customMiddlewares);
 ```
 
-## Best Practices
+## Lock Management
 
-1. **Keep Middleware Focused** - Each middleware should do one thing well
-2. **Call next.run()** - Always call the next middleware in the chain
-3. **Handle Exceptions** - Catch and rethrow with context
-4. **Immutable Context** - Don't modify original request data
-5. **Document Side Effects** - Clearly state what each middleware changes
-6. **Order Matters** - Validation before loading, fees before funds check
-7. **Test Independently** - Write unit tests for each middleware
+### Lock Manager Lifecycle
 
-## Performance Considerations
+**Option 1: Per-Service Lock Manager**
+```java
+TransferService transferService = new TransferService(repository);
+// Creates its own AccountLockManager instance
+```
 
-- Middleware chain has minimal overhead (~microseconds per middleware)
-- Synchronized transfer ensures thread safety
-- Consider async middleware for I/O operations (future enhancement)
-- Cache frequently accessed data in middleware
+**Option 2: Shared Lock Manager (Recommended)**
+```java
+AccountService accountService = new AccountService(repository);
+TransferService transferService = new TransferService(
+    repository,
+    customMiddlewares,
+    accountService.getLockManager()  // Share lock manager
+);
+```
 
-## Future Enhancements
+**When to share:**
+- ✅ When `AccountService` and `TransferService` operate on same accounts
+- ✅ When you need centralized lock monitoring
+- ✅ In production environments
 
-Potential additions that fit the middleware pattern:
+**When separate is okay:**
+- ✅ In isolated test scenarios
+- ✅ When services operate on completely different account sets
+- ✅ For specific testing requirements
 
-- **Rate Limiting** - Limit transfers per time period
-- **Currency Conversion** - Support multi-currency transfers
-- **Notification** - Send notifications on transfer completion
-- **Idempotency** - Prevent duplicate transfers
-- **Approval Workflow** - Require approval for large transfers
-- **Tax Calculation** - Calculate and report taxes
-- **Rewards Program** - Award points for transfers
+### Memory Usage
+
+- Each lock (ReentrantLock) ≈ 64 bytes
+- 100K accounts × 64 bytes = 6.4 MB (negligible)
+- Locks created lazily (only when account is first used)
+- **Shared lock manager reduces memory overhead**
+
+## Integration Examples
+
+### Example 1: Application Setup (from Application.java)
+
+```java
+public class Application {
+    public static void main(String[] args) {
+        // Initialize repository
+        AccountRepository accountRepository = new InMemoryAccountRepository();
+
+        // Initialize services with independent lock managers
+        AccountService accountService = new AccountService(accountRepository);
+        TransferService transferService = new TransferService(accountRepository);
+        
+        // Note: In production, consider sharing lock managers:
+        // TransferService transferService = new TransferService(
+        //     accountRepository,
+        //     defaultMiddlewares,
+        //     accountService.getLockManager()
+        // );
+
+        // ...rest of setup
+    }
+}
+```
+
+### Example 2: AccountService Internal Usage
+
+```java
+public class AccountService {
+    private final TransferService transferService;
+    private final AccountLockManager lockManager;
+
+    public AccountService(AccountRepository accountRepository) {
+        this.lockManager = new AccountLockManager();
+
+        // Share the same lock manager with TransferService
+        this.transferService = new TransferService(
+            accountRepository,
+            Arrays.asList(
+                new TransferValidationMiddleware(),
+                new AccountLoadingMiddleware(accountRepository),
+                new TransactionFeeMiddleware(),
+                new SufficientFundsMiddleware()
+            ),
+            this.lockManager  // Pass the shared lock manager
+        );
+    }
+}
+```

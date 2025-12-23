@@ -76,6 +76,29 @@ public class AccountService {
     }
 
     /**
+     * Add to account balance atomically.
+     * Thread-safe: Performs read-modify-write under lock.
+     * Use this for concurrent balance updates instead of read-then-updateBalance().
+     * 
+     * @param id Account ID
+     * @param amount Amount to add (can be negative to subtract)
+     * @return Updated account
+     */
+    public Account addToBalance(String id, BigDecimal amount) {
+        ReentrantLock lock = lockManager.getLock(id);
+        lock.lock();
+        try {
+            Account account = accountRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + id));
+            BigDecimal newBalance = account.getBalance().add(amount);
+            account.setBalance(newBalance);
+            return accountRepository.save(account);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * Delete an account.
      * Thread-safe: Uses fine-grained locking per account ID.
      */
