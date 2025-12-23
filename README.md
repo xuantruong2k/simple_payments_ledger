@@ -64,7 +64,80 @@ mvn clean install
 mvn test
 ```
 
-## Usage Example
+## REST API
+
+### Starting the Application
+
+```bash
+mvn clean compile
+mvn exec:java -Dexec.mainClass="com.ledger.Application"
+```
+
+The API will start on `http://localhost:7070`
+
+### Available Endpoints
+
+#### Create Account
+```bash
+POST /accounts
+Content-Type: application/json
+
+{
+  "id": "ACC001",
+  "initialBalance": 1000.50  # Optional, defaults to 0
+}
+
+# Response (201 Created)
+{
+  "id": "ACC001",
+  "balance": 1000.50
+}
+```
+
+#### Get Account
+```bash
+GET /accounts/{account_id}
+
+# Response (200 OK)
+{
+  "id": "ACC001",
+  "balance": 1000.50
+}
+
+# Error Response (404 Not Found)
+{
+  "error": "NOT_FOUND",
+  "message": "Account not found: ACC001"
+}
+```
+
+### Error Responses
+- `400 BAD_REQUEST` - Invalid input data
+- `404 NOT_FOUND` - Account not found
+- `409 CONFLICT` - Account already exists
+- `500 INTERNAL_ERROR` - Server error
+
+## Architecture
+
+The project follows the **Controller/Handler** pattern:
+- **Controller** - Defines routes and maps them to handlers
+- **Handler** - Contains the business logic for each endpoint
+- **Service** - Business logic layer
+- **Repository** - Data access abstraction
+
+### Code Structure
+```
+controller/
+  └── AccountController.java    # Route definitions
+handler/
+  └── AccountHandler.java       # Request/response handling logic
+dto/
+  ├── CreateAccountRequest.java # Request DTOs
+  ├── AccountResponse.java      # Response DTOs
+  └── ErrorResponse.java        # Error DTOs
+```
+
+## Usage Example (Programmatic)
 
 ```java
 // Create repository
@@ -87,7 +160,7 @@ List<Account> accounts = service.getAllAccounts();
 ```
 
 ## Future Enhancements
-- REST API controllers
 - Transaction management
 - Database implementation of AccountRepository
 - Authentication and authorization
+- Rate limiting
