@@ -75,6 +75,20 @@ mvn exec:java -Dexec.mainClass="com.ledger.Application"
 
 The API will start on `http://localhost:7070`
 
+## Testing
+
+This project includes a comprehensive test suite with **58 tests** covering:
+- Unit tests for models, repositories, and services
+- Integration tests for REST API endpoints
+- Concurrency tests for race conditions and deadlock prevention
+
+### Run all tests:
+```bash
+mvn test
+```
+
+See [TESTING.md](TESTING.md) for detailed test documentation.
+
 ### Available Endpoints
 
 #### Create Account
