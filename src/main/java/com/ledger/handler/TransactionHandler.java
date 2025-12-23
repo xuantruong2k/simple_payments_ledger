@@ -4,20 +4,26 @@ import com.ledger.dto.ErrorResponse;
 import com.ledger.dto.TransferRequest;
 import com.ledger.dto.TransferResponse;
 import com.ledger.service.AccountService;
+import com.ledger.service.TransferService;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 
+/**
+ * Handler for transaction-related HTTP requests.
+ * Decoupled from business logic - delegates to TransferService.
+ */
 public class TransactionHandler {
-    private final AccountService accountService;
+    private final TransferService transferService;
 
-    public TransactionHandler(AccountService accountService) {
-        this.accountService = accountService;
+    public TransactionHandler(TransferService transferService) {
+        this.transferService = transferService;
     }
 
     public void transfer(Context ctx) {
         try {
             TransferRequest request = ctx.bodyAsClass(TransferRequest.class);
 
+            // Minimal validation (detailed validation happens in middleware)
             if (request.getFromAccountId() == null || request.getFromAccountId().trim().isEmpty()) {
                 ctx.status(HttpStatus.BAD_REQUEST)
                    .json(new ErrorResponse("BAD_REQUEST", "from_account_id is required"));
@@ -36,7 +42,8 @@ public class TransactionHandler {
                 return;
             }
 
-            AccountService.TransferResult result = accountService.transfer(
+            // Delegate to TransferService (which uses middleware chain)
+            TransferService.TransferResult result = transferService.transfer(
                 request.getFromAccountId(),
                 request.getToAccountId(),
                 request.getAmount()

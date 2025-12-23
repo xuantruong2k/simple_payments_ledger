@@ -9,6 +9,7 @@ import com.ledger.handler.TransactionHandler;
 import com.ledger.repository.AccountRepository;
 import com.ledger.repository.InMemoryAccountRepository;
 import com.ledger.service.AccountService;
+import com.ledger.service.TransferService;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
 import okhttp3.*;
@@ -38,11 +39,12 @@ class ApiIntegrationTest {
 
         AccountRepository accountRepository = new InMemoryAccountRepository();
         AccountService accountService = new AccountService(accountRepository);
+        TransferService transferService = new TransferService(accountRepository);
 
         AccountHandler accountHandler = new AccountHandler(accountService);
         AccountController accountController = new AccountController(accountHandler);
 
-        TransactionHandler transactionHandler = new TransactionHandler(accountService);
+        TransactionHandler transactionHandler = new TransactionHandler(transferService);
         TransactionController transactionController = new TransactionController(transactionHandler);
 
         app = Javalin.create(config -> {

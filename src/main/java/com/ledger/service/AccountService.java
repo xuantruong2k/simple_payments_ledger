@@ -9,9 +9,11 @@ import java.util.Optional;
 
 public class AccountService {
     private final AccountRepository accountRepository;
+    private final TransferService transferService;
 
     public AccountService(AccountRepository accountRepository) {
         this.accountRepository = accountRepository;
+        this.transferService = new TransferService(accountRepository);
     }
 
     public Account createAccount(String id, BigDecimal initialBalance) {
@@ -41,42 +43,25 @@ public class AccountService {
         accountRepository.deleteById(id);
     }
 
-    public synchronized TransferResult transfer(String fromAccountId, String toAccountId, BigDecimal amount) {
-        if (fromAccountId == null || fromAccountId.trim().isEmpty()) {
-            throw new IllegalArgumentException("From account ID is required");
-        }
-        if (toAccountId == null || toAccountId.trim().isEmpty()) {
-            throw new IllegalArgumentException("To account ID is required");
-        }
-        if (amount == null) {
-            throw new IllegalArgumentException("Amount is required");
-        }
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero");
-        }
-        if (fromAccountId.equals(toAccountId)) {
-            throw new IllegalArgumentException("Cannot transfer to the same account");
-        }
-
-        Account fromAccount = accountRepository.findById(fromAccountId)
-                .orElseThrow(() -> new IllegalArgumentException("From account not found: " + fromAccountId));
-
-        Account toAccount = accountRepository.findById(toAccountId)
-                .orElseThrow(() -> new IllegalArgumentException("To account not found: " + toAccountId));
-
-        if (fromAccount.getBalance().compareTo(amount) < 0) {
-            throw new InsufficientFundsException("Insufficient funds in account: " + fromAccountId);
-        }
-
-        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
-        toAccount.setBalance(toAccount.getBalance().add(amount));
-
-        accountRepository.save(fromAccount);
-        accountRepository.save(toAccount);
-
-        return new TransferResult(fromAccount, toAccount, amount);
+    /**
+     * Transfer money between accounts using the new middleware-based TransferService.
+     * This method delegates to TransferService for extensibility.
+     */
+    public TransferResult transfer(String fromAccountId, String toAccountId, BigDecimal amount) {
+        TransferService.TransferResult result = transferService.transfer(fromAccountId, toAccountId, amount);
+        
+        // Convert to legacy TransferResult for backward compatibility
+        return new TransferResult(
+            result.getFromAccount(),
+            result.getToAccount(),
+            result.getAmount()
+        );
     }
 
+    /**
+     * Legacy TransferResult class for backward compatibility.
+     * Does not include fee information.
+     */
     public static class TransferResult {
         private final Account fromAccount;
         private final Account toAccount;

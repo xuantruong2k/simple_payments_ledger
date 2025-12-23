@@ -7,24 +7,33 @@ import com.ledger.handler.TransactionHandler;
 import com.ledger.repository.AccountRepository;
 import com.ledger.repository.InMemoryAccountRepository;
 import com.ledger.service.AccountService;
+import com.ledger.service.TransferService;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
 
 public class Application {
     public static void main(String[] args) {
+        // Initialize repository
         AccountRepository accountRepository = new InMemoryAccountRepository();
+        
+        // Initialize services
         AccountService accountService = new AccountService(accountRepository);
+        TransferService transferService = new TransferService(accountRepository);
         
+        // Initialize handlers
         AccountHandler accountHandler = new AccountHandler(accountService);
-        AccountController accountController = new AccountController(accountHandler);
+        TransactionHandler transactionHandler = new TransactionHandler(transferService);
         
-        TransactionHandler transactionHandler = new TransactionHandler(accountService);
+        // Initialize controllers
+        AccountController accountController = new AccountController(accountHandler);
         TransactionController transactionController = new TransactionController(transactionHandler);
 
+        // Start Javalin server
         Javalin app = Javalin.create(config -> {
             config.jsonMapper(new JavalinJackson());
         }).start(8080);
 
+        // Register routes
         accountController.registerRoutes(app);
         transactionController.registerRoutes(app);
 
