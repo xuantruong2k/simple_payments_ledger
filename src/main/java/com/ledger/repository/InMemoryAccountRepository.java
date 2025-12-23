@@ -3,6 +3,7 @@ package com.ledger.repository;
 import com.ledger.model.Account;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,6 +19,38 @@ public class InMemoryAccountRepository implements AccountRepository {
         }
         storage.put(account.getId(), account);
         return account;
+    }
+
+    /**
+     * Save multiple accounts atomically using two-phase commit pattern.
+     * Phase 1: Validate all accounts and prepare changes in temporary map
+     * Phase 2: Apply all changes atomically with putAll()
+     * 
+     * This ensures that if any validation fails, NO accounts are saved.
+     */
+    @Override
+    public void saveAll(Account... accounts) {
+        if (accounts == null || accounts.length == 0) {
+            return;
+        }
+        
+        // PHASE 1: Validate and prepare all changes
+        // If any exception occurs here, nothing has been written to storage yet
+        Map<String, Account> updates = new HashMap<>();
+        for (Account account : accounts) {
+            if (account == null) {
+                throw new IllegalArgumentException("Cannot save null account");
+            }
+            if (account.getId() == null) {
+                throw new IllegalArgumentException("Account ID cannot be null");
+            }
+            updates.put(account.getId(), account);
+        }
+        
+        // PHASE 2: Apply all changes atomically
+        // putAll() is more atomic than individual puts in a loop
+        // If this fails (e.g., OutOfMemoryError), it's a catastrophic failure
+        storage.putAll(updates);
     }
 
     @Override

@@ -95,9 +95,8 @@ public class TransferExecutor {
             context.getToAccount().getBalance().add(context.getEffectiveAmount())
         );
 
-        // Save both accounts
-        accountRepository.save(context.getFromAccount());
-        accountRepository.save(context.getToAccount());
+        // Save both accounts atomically - all or nothing
+        accountRepository.saveAll(context.getFromAccount(), context.getToAccount());
     }
 
     /**
