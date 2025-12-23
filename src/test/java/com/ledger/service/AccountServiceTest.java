@@ -90,11 +90,54 @@ class AccountServiceTest {
     }
 
     @Test
+    void testUpdateBalanceToNegativeThrowsException() {
+        accountService.createAccount("ACC001", new BigDecimal("1000.00"));
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            accountService.updateBalance("ACC001", new BigDecimal("-100.00"));
+        });
+
+        assertTrue(exception.getMessage().contains("Balance cannot be negative"));
+    }
+
+    @Test
     void testUpdateBalanceForNonExistentAccountThrowsException() {
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
             accountService.updateBalance("NONEXISTENT", new BigDecimal("1500.00"));
         });
 
         assertEquals("Account not found: NONEXISTENT", exception.getMessage());
+    }
+
+    @Test
+    void testAddToBalance() {
+        accountService.createAccount("ACC001", new BigDecimal("1000.00"));
+
+        Account updatedAccount = accountService.addToBalance("ACC001", new BigDecimal("500.00"));
+
+        assertEquals(new BigDecimal("1500.00"), updatedAccount.getBalance());
+    }
+
+    @Test
+    void testAddToBalanceNegativeAmount() {
+        accountService.createAccount("ACC001", new BigDecimal("1000.00"));
+
+        Account updatedAccount = accountService.addToBalance("ACC001", new BigDecimal("-200.00"));
+
+        assertEquals(new BigDecimal("800.00"), updatedAccount.getBalance());
+    }
+
+    @Test
+    void testAddToBalanceResultingInNegativeThrowsException() {
+        accountService.createAccount("ACC001", new BigDecimal("100.00"));
+
+        Exception exception = assertThrows(AccountService.InsufficientFundsException.class, () -> {
+            accountService.addToBalance("ACC001", new BigDecimal("-200.00"));
+        });
+
+        assertTrue(exception.getMessage().contains("Insufficient funds"));
+        
+        // Verify balance unchanged
+        assertEquals(new BigDecimal("100.00"), accountService.getAccount("ACC001").get().getBalance());
     }
 }

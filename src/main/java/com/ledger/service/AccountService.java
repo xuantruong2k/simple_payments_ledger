@@ -61,8 +61,17 @@ public class AccountService {
     /**
      * Update account balance.
      * Thread-safe: Uses fine-grained locking per account ID.
+     * 
+     * @param id Account ID
+     * @param newBalance New balance (must be non-negative)
+     * @return Updated account
+     * @throws IllegalArgumentException if account not found or balance is negative
      */
     public Account updateBalance(String id, BigDecimal newBalance) {
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Balance cannot be negative: " + newBalance);
+        }
+        
         ReentrantLock lock = lockManager.getLock(id);
         lock.lock();
         try {
@@ -83,6 +92,8 @@ public class AccountService {
      * @param id Account ID
      * @param amount Amount to add (can be negative to subtract)
      * @return Updated account
+     * @throws IllegalArgumentException if account not found
+     * @throws InsufficientFundsException if resulting balance would be negative
      */
     public Account addToBalance(String id, BigDecimal amount) {
         ReentrantLock lock = lockManager.getLock(id);
@@ -91,6 +102,16 @@ public class AccountService {
             Account account = accountRepository.findById(id)
                     .orElseThrow(() -> new IllegalArgumentException("Account not found: " + id));
             BigDecimal newBalance = account.getBalance().add(amount);
+            
+            if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                throw new InsufficientFundsException(
+                    "Insufficient funds in account " + id + 
+                    ". Current: " + account.getBalance() + 
+                    ", Requested: " + amount.abs() + 
+                    ", Would result in: " + newBalance
+                );
+            }
+            
             account.setBalance(newBalance);
             return accountRepository.save(account);
         } finally {
