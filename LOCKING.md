@@ -237,7 +237,7 @@ accountRepository.save(toAccount);
 
 ## Testing
 
-All 58 tests pass, including:
+All 74 tests pass, including:
 
 ### Concurrency Tests
 - ✅ 11 simultaneous $10 transfers from $100 account
@@ -373,6 +373,6 @@ lockManager.getLockStats(accountId);
 ✅ One lock per account (not global)
 ✅ Lock ordering prevents deadlocks
 ✅ Scales to 100K+ users
-✅ All 58 tests pass
+✅ All 74 tests pass
 ✅ No code changes needed in controllers/handlers
 ✅ Backward compatible with existing code

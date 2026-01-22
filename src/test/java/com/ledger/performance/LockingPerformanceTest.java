@@ -18,29 +18,28 @@ public class LockingPerformanceTest {
 
     @Test
     void demonstrateConcurrentTransferPerformance() throws InterruptedException {
-        System.out.println("\n=== Fine-Grained Locking Performance Demo ===\n");
-        
+        System.out.println("\n=== Virtual Threads Performance Demo (Java 21) ===\n");
+
         // Setup: 100 accounts with $10,000 each
         AccountRepository repository = new InMemoryAccountRepository();
         AccountService accountService = new AccountService(repository);
         TransferService transferService = new TransferService(repository);
-        
+
         int accountCount = 100;
         for (int i = 1; i <= accountCount; i++) {
             accountService.createAccount("ACC" + i, new BigDecimal("10000"));
         }
-        
-        // Test: 1000 random transfers using 20 threads
+
+        // Test: 1000 random transfers using virtual threads
         int transferCount = 1000;
-        int threadCount = 20;
-        
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(transferCount);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
-        
+
         long startTime = System.currentTimeMillis();
-        
+
         for (int i = 0; i < transferCount; i++) {
             final int fromIdx = ThreadLocalRandom.current().nextInt(1, accountCount + 1);
             int toIdx = ThreadLocalRandom.current().nextInt(1, accountCount + 1);
@@ -48,7 +47,7 @@ public class LockingPerformanceTest {
                 toIdx = ThreadLocalRandom.current().nextInt(1, accountCount + 1);
             }
             final int finalToIdx = toIdx;
-            
+
             executor.submit(() -> {
                 try {
                     transferService.transfer(
@@ -64,25 +63,25 @@ public class LockingPerformanceTest {
                 }
             });
         }
-        
+
         latch.await();
         long endTime = System.currentTimeMillis();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         long duration = endTime - startTime;
         double throughput = (transferCount * 1000.0) / duration;
-        
+
         System.out.println("Results:");
         System.out.println("  Transfers: " + transferCount);
-        System.out.println("  Threads: " + threadCount);
+        System.out.println("  Execution: Virtual Threads (Java 21)");
         System.out.println("  Accounts: " + accountCount);
         System.out.println("  Duration: " + duration + "ms");
         System.out.println("  Throughput: " + String.format("%.0f", throughput) + " transfers/second");
         System.out.println("  Successful: " + successCount.get());
         System.out.println("  Failed: " + failureCount.get());
         System.out.println("  Locks created: " + transferService.getLockManager().getLockCount());
-        
+
         // Verify total balance preserved
         BigDecimal totalBalance = BigDecimal.ZERO;
         for (int i = 1; i <= accountCount; i++) {
@@ -90,11 +89,11 @@ public class LockingPerformanceTest {
                 accountService.getAccount("ACC" + i).get().getBalance()
             );
         }
-        
+
         System.out.println("\nBalance Verification:");
         System.out.println("  Initial total: $" + (accountCount * 10000));
         System.out.println("  Final total: $" + totalBalance);
-        System.out.println("  Preserved: " + 
+        System.out.println("  Preserved: " +
             totalBalance.equals(new BigDecimal(accountCount * 10000)));
     }
 }

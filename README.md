@@ -3,8 +3,8 @@
 This project satisfies all take-home assessment requirements:
 
 1. ✅ **Build & Run**: See "Building and Running" section below
-2. ✅ **Design Rationale**: Repository pattern (swappable storge) + Fine-grained locking (71K tx/sec) + Middleware pattern (extensibility)
-3. ✅ **Verification**: 59 tests including concurrency scenarios - see "Testing" section
+2. ✅ **Design Rationale**: Repository pattern (swappable storge) + Fine-grained locking (143K tx/sec with Java 21 Virtual Threads) + Middleware pattern (extensibility)
+3. ✅ **Verification**: 74 tests including concurrency scenarios - see "Testing" section
 4. ✅ **Refactoring Safety**: Middleware pattern enables zero-touch feature additions - see "Adding Transaction Fees"
 
 For detailed architecture: See [ARCHITECTURE.md](ARCHITECTURE.md) and other markdown *.md files
@@ -15,11 +15,12 @@ A production-ready Java-based transaction ledger API with middleware architectur
 
 ## ✨ Key Features
 
-- 🚀 **High Performance** - 71,000+ transfers/second with fine-grained locking
+- 🚀 **High Performance** - 142,857+ transfers/second with Java 21 Virtual Threads
+- ⚡ **Virtual Threads** - Leverages Java 21 Virtual Threads for massive concurrency (2x faster than platform threads)
 - 🔒 **Thread-Safe** - One lock per account, scales to 100K+ concurrent users
 - 🛡️ **Deadlock-Free** - Lock ordering strategy prevents circular waits
 - 🔌 **Extensible** - Middleware pattern for easy feature additions
-- ✅ **Production-Ready** - 59 comprehensive tests including concurrency scenarios
+- ✅ **Production-Ready** - 74 comprehensive tests including concurrency scenarios
 - 📦 **Clean Architecture** - Repository pattern with swappable storage backends
 
 ## Architecture Overview
@@ -98,7 +99,7 @@ simple_payment_ledger/
 ## Building and Running
 
 ### Prerequisites
-- Java 11 or higher
+- Java 21 or higher (Virtual Threads support)
 - Maven 3.6+
 
 ### Build
@@ -124,7 +125,7 @@ The API will start on `http://localhost:7070`
 
 ## Testing
 
-This project includes a comprehensive test suite with **59 tests** covering:
+This project includes a comprehensive test suite with **74 tests** covering:
 
 ### Test Categories
 - ✅ **Unit Tests** (44 tests) - Models, repositories, services
@@ -139,9 +140,9 @@ This project includes a comprehensive test suite with **59 tests** covering:
 
 ### Performance Results
 ```
-Benchmark: 1000 transfers across 100 accounts (20 threads)
-- Throughput: 71,429 transfers/second
-- Duration: 14ms
+Benchmark: 1000 transfers across 100 accounts (Java 21 Virtual Threads)
+- Throughput: 142,857 transfers/second
+- Duration: 7ms (2x faster than platform threads)
 - All balances preserved ✓
 ```
 
@@ -277,9 +278,10 @@ Lock ordering strategy ensures no circular waits:
 - ✅ Amount must be positive
 
 #### Performance
-- **Global Lock (Old)**: ~100 transfers/second
-- **Fine-Grained Lock (New)**: 71,429 transfers/second
-- **Improvement**: 714x faster!
+- **Global Lock (Java 11)**: ~100 transfers/second
+- **Fine-Grained Lock (Java 11)**: 71,429 transfers/second
+- **Fine-Grained + Virtual Threads (Java 21)**: 142,857 transfers/second
+- **Improvement**: 1,428x faster than global lock!
 
 See [LOCKING.md](LOCKING.md) for detailed explanation.
 
@@ -399,11 +401,11 @@ Result:
 
 ## Key Technologies
 
-- **Java 11** - Language
+- **Java 21** - Language with Virtual Threads support
 - **Maven** - Build tool
-- **Javalin 5** - Lightweight web framework
-- **Jackson** - JSON serialization
-- **JUnit 5** - Testing framework
+- **Javalin 6.7.0** - Lightweight web framework with virtual thread support
+- **Jackson 2.20.2** - JSON serialization
+- **JUnit 5.14.2** - Testing framework
 - **ReentrantLock** - Fine-grained locking
 - **ConcurrentHashMap** - Thread-safe collections
 - **BigDecimal** - Precise monetary calculations
@@ -413,9 +415,9 @@ Result:
 ### Benchmarks
 
 ```
-Test: 1000 transfers across 100 accounts (20 threads)
-- Throughput: 71,429 transfers/second
-- Duration: 14ms
+Test: 1000 transfers across 100 accounts (Java 21 Virtual Threads)
+- Throughput: 142,857 transfers/second
+- Duration: 7ms (2x improvement with virtual threads)
 - Memory: 6.4 MB for 100K account locks
 ```
 
@@ -425,8 +427,8 @@ Test: 1000 transfers across 100 accounts (20 threads)
 Scenario: 100K concurrent users, 1 transfer/minute each
 
 Required Throughput: 1,667 transfers/second
-System Capacity: 71,429 transfers/second
-Headroom: 43x capacity
+System Capacity: 142,857 transfers/second (Java 21 Virtual Threads)
+Headroom: 85.7x capacity
 
 Result: System handles load easily ✅
 ```

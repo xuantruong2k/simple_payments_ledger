@@ -33,10 +33,10 @@ public class TransferAtomicityTest {
         // Create accounts
         accountService.createAccount("A", new BigDecimal("1000.00"));
         accountService.createAccount("B", new BigDecimal("500.00"));
-        
+
         // Transfer
         transferService.transfer("A", "B", new BigDecimal("300.00"));
-        
+
         // Verify both accounts updated
         assertEquals(new BigDecimal("700.00"), accountService.getAccount("A").get().getBalance());
         assertEquals(new BigDecimal("800.00"), accountService.getAccount("B").get().getBalance());
@@ -46,12 +46,12 @@ public class TransferAtomicityTest {
     void testTransferAtomicity_InsufficientFunds_NoChanges() {
         accountService.createAccount("A", new BigDecimal("100.00"));
         accountService.createAccount("B", new BigDecimal("500.00"));
-        
+
         // Try to transfer more than available
         assertThrows(AccountService.InsufficientFundsException.class, () -> {
             transferService.transfer("A", "B", new BigDecimal("200.00"));
         });
-        
+
         // Verify no changes to either account
         assertEquals(new BigDecimal("100.00"), accountService.getAccount("A").get().getBalance());
         assertEquals(new BigDecimal("500.00"), accountService.getAccount("B").get().getBalance());
@@ -61,11 +61,11 @@ public class TransferAtomicityTest {
     void testTransferAtomicity_NonExistentAccount_NoChanges() {
         accountService.createAccount("A", new BigDecimal("1000.00"));
         // B doesn't exist
-        
+
         assertThrows(IllegalArgumentException.class, () -> {
             transferService.transfer("A", "B", new BigDecimal("100.00"));
         });
-        
+
         // Verify A unchanged
         assertEquals(new BigDecimal("1000.00"), accountService.getAccount("A").get().getBalance());
     }
@@ -76,13 +76,13 @@ public class TransferAtomicityTest {
         for (int i = 0; i < 10; i++) {
             accountService.createAccount("ACC" + i, new BigDecimal("1000.00"));
         }
-        
+
         BigDecimal initialTotal = new BigDecimal("10000.00");
-        
+
         // Perform 100 random transfers concurrently
-        ExecutorService executor = Executors.newFixedThreadPool(20);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(100);
-        
+
         for (int i = 0; i < 100; i++) {
             executor.submit(() -> {
                 try {
@@ -91,7 +91,7 @@ public class TransferAtomicityTest {
                     while (toIdx == fromIdx) {
                         toIdx = ThreadLocalRandom.current().nextInt(0, 10);
                     }
-                    
+
                     transferService.transfer(
                         "ACC" + fromIdx,
                         "ACC" + toIdx,
@@ -104,11 +104,11 @@ public class TransferAtomicityTest {
                 }
             });
         }
-        
+
         latch.await(10, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         // Calculate total balance across all accounts
         BigDecimal finalTotal = BigDecimal.ZERO;
         for (int i = 0; i < 10; i++) {
@@ -116,9 +116,9 @@ public class TransferAtomicityTest {
                 accountService.getAccount("ACC" + i).get().getBalance()
             );
         }
-        
+
         // Total should be preserved (no money created or destroyed)
-        assertEquals(initialTotal, finalTotal, 
+        assertEquals(initialTotal, finalTotal,
             "Total balance must be preserved - atomicity violated if different");
     }
 
@@ -126,12 +126,12 @@ public class TransferAtomicityTest {
     void testBidirectionalTransfers_NoDeadlock_BalancePreserved() throws InterruptedException {
         accountService.createAccount("A", new BigDecimal("1000.00"));
         accountService.createAccount("B", new BigDecimal("1000.00"));
-        
+
         BigDecimal initialTotal = new BigDecimal("2000.00");
-        
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(100);
-        
+
         // 50 transfers A→B
         for (int i = 0; i < 50; i++) {
             executor.submit(() -> {
@@ -144,7 +144,7 @@ public class TransferAtomicityTest {
                 }
             });
         }
-        
+
         // 50 transfers B→A
         for (int i = 0; i < 50; i++) {
             executor.submit(() -> {
@@ -157,15 +157,15 @@ public class TransferAtomicityTest {
                 }
             });
         }
-        
+
         latch.await(10, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         // Verify total balance preserved
         BigDecimal finalTotal = accountService.getAccount("A").get().getBalance()
             .add(accountService.getAccount("B").get().getBalance());
-        
+
         assertEquals(initialTotal, finalTotal,
             "Total balance must be preserved despite bidirectional transfers");
     }
@@ -176,13 +176,13 @@ public class TransferAtomicityTest {
         for (int i = 0; i < 100; i++) {
             accountService.createAccount("ACC" + i, new BigDecimal("100.00"));
         }
-        
+
         BigDecimal initialTotal = new BigDecimal("10000.00");
-        
+
         // Perform 1000 random transfers with high concurrency
-        ExecutorService executor = Executors.newFixedThreadPool(50);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(1000);
-        
+
         for (int i = 0; i < 1000; i++) {
             executor.submit(() -> {
                 try {
@@ -191,7 +191,7 @@ public class TransferAtomicityTest {
                     while (toIdx == fromIdx) {
                         toIdx = ThreadLocalRandom.current().nextInt(0, 100);
                     }
-                    
+
                     transferService.transfer(
                         "ACC" + fromIdx,
                         "ACC" + toIdx,
@@ -204,11 +204,11 @@ public class TransferAtomicityTest {
                 }
             });
         }
-        
+
         latch.await(15, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         // Verify total balance preserved
         BigDecimal finalTotal = BigDecimal.ZERO;
         for (int i = 0; i < 100; i++) {
@@ -216,7 +216,7 @@ public class TransferAtomicityTest {
                 accountService.getAccount("ACC" + i).get().getBalance()
             );
         }
-        
+
         assertEquals(initialTotal, finalTotal,
             "Atomicity violated: Total balance changed under high concurrency");
     }
@@ -225,23 +225,23 @@ public class TransferAtomicityTest {
     void testTransferWithFees_Atomicity() {
         // Even with fees, atomicity must be preserved
         // This test verifies that the two-phase commit in saveAll() works correctly
-        
+
         accountService.createAccount("A", new BigDecimal("1000.00"));
         accountService.createAccount("B", new BigDecimal("500.00"));
-        
+
         BigDecimal initialTotal = new BigDecimal("1500.00");
-        
+
         // Transfer (fees are currently $0, but the mechanism should still work)
         transferService.transfer("A", "B", new BigDecimal("300.00"));
-        
+
         // Verify atomicity: both accounts updated
         assertNotNull(accountService.getAccount("A").get());
         assertNotNull(accountService.getAccount("B").get());
-        
+
         // Verify total preserved (minus fees if any)
         BigDecimal finalTotal = accountService.getAccount("A").get().getBalance()
             .add(accountService.getAccount("B").get().getBalance());
-        
+
         // Should be 1500 - fees (currently fees = 0)
         assertTrue(finalTotal.compareTo(BigDecimal.ZERO) > 0,
             "Final balance should be positive");

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project includes a comprehensive test suite with **58 tests** covering unit tests, integration tests, and concurrency tests. All tests use JUnit 5 and can be run as part of the Maven build process.
+This project includes a comprehensive test suite with **74 tests** covering unit tests, integration tests, and concurrency tests. All tests use JUnit 5 and can be run as part of the Maven build process with Java 21 Virtual Threads.
 
 ## Test Structure
 

@@ -31,12 +31,12 @@ public class AccountServiceConcurrencyTest {
     void testConcurrentCreateAccountWithSameId() throws InterruptedException {
         int threadCount = 10;
         String accountId = "TEST_ACCOUNT";
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(threadCount);
-        
+
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
-        
+
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
@@ -51,11 +51,11 @@ public class AccountServiceConcurrencyTest {
                 }
             });
         }
-        
+
         latch.await(5, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         assertEquals(1, successCount.get());
         assertEquals(9, failureCount.get());
         assertTrue(accountRepository.existsById(accountId));
@@ -64,10 +64,10 @@ public class AccountServiceConcurrencyTest {
     @Test
     void testConcurrentCreateDifferentAccounts() throws InterruptedException {
         int threadCount = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(20);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(threadCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        
+
         for (int i = 0; i < threadCount; i++) {
             final int accountNum = i;
             executor.submit(() -> {
@@ -79,11 +79,11 @@ public class AccountServiceConcurrencyTest {
                 }
             });
         }
-        
+
         latch.await(5, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         assertEquals(100, successCount.get());
         assertEquals(100, accountRepository.count());
     }
@@ -92,12 +92,12 @@ public class AccountServiceConcurrencyTest {
     void testConcurrentUpdateBalance() throws InterruptedException {
         String accountId = "TEST_UPDATE";
         accountService.createAccount(accountId, BigDecimal.ZERO);
-        
+
         int threadCount = 100;
         BigDecimal incrementAmount = new BigDecimal("10.00");
-        ExecutorService executor = Executors.newFixedThreadPool(20);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(threadCount);
-        
+
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
@@ -108,11 +108,11 @@ public class AccountServiceConcurrencyTest {
                 }
             });
         }
-        
+
         latch.await(5, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         Account finalAccount = accountService.getAccount(accountId).get();
         assertEquals(new BigDecimal("1000.00"), finalAccount.getBalance());
     }
@@ -121,11 +121,11 @@ public class AccountServiceConcurrencyTest {
     void testNoLostUpdates() throws InterruptedException {
         String accountId = "STRESS_TEST";
         accountService.createAccount(accountId, BigDecimal.ZERO);
-        
+
         int updateCount = 1000;
-        ExecutorService executor = Executors.newFixedThreadPool(50);
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(updateCount);
-        
+
         for (int i = 0; i < updateCount; i++) {
             executor.submit(() -> {
                 try {
@@ -136,11 +136,11 @@ public class AccountServiceConcurrencyTest {
                 }
             });
         }
-        
+
         latch.await(10, TimeUnit.SECONDS);
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
-        
+
         Account finalAccount = accountService.getAccount(accountId).get();
         assertEquals(new BigDecimal("1000.00"), finalAccount.getBalance());
     }

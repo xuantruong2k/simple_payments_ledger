@@ -26,7 +26,7 @@ class ApiIntegrationTest {
 
     private static final int TEST_PORT = 7777;
     private static final String BASE_URL = "http://localhost:" + TEST_PORT;
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final okhttp3.MediaType JSON = okhttp3.MediaType.get("application/json; charset=utf-8");
 
     private static Javalin app;
     private static OkHttpClient client;

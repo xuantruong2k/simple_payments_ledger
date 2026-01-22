@@ -10,6 +10,10 @@ import com.ledger.service.AccountService;
 import com.ledger.service.TransferService;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 public class Application {
     public static void main(String[] args) {
@@ -28,9 +32,19 @@ public class Application {
         AccountController accountController = new AccountController(accountHandler);
         TransactionController transactionController = new TransactionController(transactionHandler);
 
-        // Start Javalin server
+        // Start Javalin server with Virtual Thread support (Java 21)
+        // Configure Jetty to use Virtual Threads for handling HTTP requests
         Javalin app = Javalin.create(config -> {
             config.jsonMapper(new JavalinJackson());
+
+            // Create a ThreadFactory that spawns virtual threads
+            ThreadFactory virtualThreadFactory = Thread.ofVirtual().factory();
+
+            // Configure Jetty thread pool with virtual thread factory
+            // Virtual threads are lightweight (~1KB each), so we can safely use a large pool
+            // 10,000 virtual threads = only ~10MB memory vs 10GB for platform threads
+            config.jetty.threadPool = new QueuedThreadPool(10000, 10, 60000, -1,
+                null, null, virtualThreadFactory);
         }).start(7070);
 
         // Register routes
@@ -38,5 +52,6 @@ public class Application {
         transactionController.registerRoutes(app);
 
         System.out.println("Simple Payment Ledger API is running on http://localhost:7070");
+        System.out.println("Using Java " + Runtime.version() + " with Virtual Threads enabled");
     }
 }

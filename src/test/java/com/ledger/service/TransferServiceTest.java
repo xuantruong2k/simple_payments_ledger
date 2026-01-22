@@ -222,14 +222,14 @@ class TransferServiceTest {
     void testConcurrentTransfersFromSameAccount() throws InterruptedException {
         // Create account with $100
         accountService.createAccount("SENDER", new BigDecimal("100.00"));
-        
+
         // Create 11 receiver accounts
         for (int i = 1; i <= 11; i++) {
             accountService.createAccount("RECEIVER" + i, BigDecimal.ZERO);
         }
 
         int numberOfTransfers = 11;
-        ExecutorService executorService = Executors.newFixedThreadPool(numberOfTransfers);
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(numberOfTransfers);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
@@ -281,7 +281,7 @@ class TransferServiceTest {
         }
 
         int numberOfTransfers = 50;
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(numberOfTransfers);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
@@ -290,7 +290,7 @@ class TransferServiceTest {
         for (int i = 0; i < numberOfTransfers; i++) {
             final int fromIdx = (i % numberOfAccounts) + 1;
             final int toIdx = ((i + 1) % numberOfAccounts) + 1;
-            
+
             executorService.submit(() -> {
                 try {
                     accountService.transfer("ACC" + fromIdx, "ACC" + toIdx, new BigDecimal("10.00"));
@@ -324,7 +324,7 @@ class TransferServiceTest {
         accountService.createAccount("ACC2", new BigDecimal("1000.00"));
 
         int numberOfIterations = 100;
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(numberOfIterations * 2);
         List<Exception> exceptions = Collections.synchronizedList(new ArrayList<>());
 
@@ -376,14 +376,14 @@ class TransferServiceTest {
     @Test
     void testRaceConditionOnSingleAccount() throws InterruptedException {
         accountService.createAccount("SOURCE", new BigDecimal("1000.00"));
-        
+
         // Create 100 target accounts
         for (int i = 1; i <= 100; i++) {
             accountService.createAccount("TARGET" + i, BigDecimal.ZERO);
         }
 
         int numberOfThreads = 100;
-        ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
