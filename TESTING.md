@@ -111,15 +111,15 @@ Comprehensive transfer logic testing:
 - ✅ **Race conditions**: 11 simultaneous $10 transfers from $100 account
   - Validates only 10 succeed, 1 fails with insufficient funds
   - Verifies total balance preservation
-  
+
 - ✅ **Multiple accounts concurrency**: 50 random transfers between 10 accounts
   - Ensures total system balance remains constant
-  
+
 - ✅ **Deadlock prevention**: 100 bidirectional transfers between 2 accounts
   - ACC1 → ACC2 and ACC2 → ACC1 simultaneously
   - Verifies no deadlocks occur
   - Validates balance preservation
-  
+
 - ✅ **Race condition on single account**: 100 threads transferring from one source
   - All 100 transfers of $10 from $1000 account should succeed
   - Verifies atomic operations

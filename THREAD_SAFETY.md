@@ -135,18 +135,18 @@ public Account addToBalance(String id, BigDecimal amount) {
 public TransferResult transfer(String fromId, String toId, BigDecimal amount) {
     // 1. Acquire locks in deterministic order (prevents deadlocks)
     LockPair locks = lockManager.acquireLocks(fromId, toId);
-    
+
     try {
         // 2. Execute middleware chain (validation, loading, fees, etc.)
         middleware.process(context);
-        
+
         // 3. Execute transfer atomically
         debitAccount(fromAccount, amount + fee);
         creditAccount(toAccount, amount);
-        
+
         // 4. Save both accounts atomically
         repository.saveAll(fromAccount, toAccount);
-        
+
         return result;
     } finally {
         // 5. Always release locks
@@ -183,7 +183,7 @@ public void saveAll(Account... accounts) {
         if (account == null) throw new Exception();
         updates.put(account.getId(), account);
     }
-    
+
     // Phase 2: Apply all changes atomically
     storage.putAll(updates);  // ConcurrentHashMap.putAll() is atomic
 }
@@ -242,7 +242,7 @@ AccountLockManager:
       Used for: Account creation, balance updates, transfers
       Scope: Individual account IDs
       Ordering: Alphabetical by account ID (for multi-account ops)
-      
+
 Operation Examples:
   - createAccount("ACC001") → Locks "ACC001" only
   - createAccount("ACC002") → Locks "ACC002" only (parallel with above!)
@@ -377,7 +377,7 @@ try {
 ```
 Total Tests: 70 (all passing)
 - Unit Tests: 44
-- Integration Tests: 14  
+- Integration Tests: 14
 - Concurrency Tests: 4 (AccountService)
 - Atomicity Tests: 7 (Transfer)
 - Performance Tests: 1
@@ -429,7 +429,7 @@ int lockCount = transferService.getLockManager().getLockCount();
 ## Summary
 
 ✅ **Account Creation** - Global lock prevents duplicates
-✅ **Balance Updates** - Per-account lock prevents lost updates  
+✅ **Balance Updates** - Per-account lock prevents lost updates
 ✅ **Atomic Add** - Read-modify-write under lock
 ✅ **Money Transfer** - Fine-grained locking with lock ordering
 ✅ **Repository** - ConcurrentHashMap + atomic saveAll()

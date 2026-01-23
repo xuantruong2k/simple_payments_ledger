@@ -43,7 +43,7 @@ Manages a lock per account using `ConcurrentHashMap<String, ReentrantLock>`:
 ```java
 public class AccountLockManager {
     private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
-    
+
     // One lock per account, created lazily
     public ReentrantLock getLock(String accountId) {
         return locks.computeIfAbsent(accountId, k -> new ReentrantLock());
@@ -60,7 +60,7 @@ Thread 1: Transfer A → B
   - Locks A
   - Tries to lock B (waits)
 
-Thread 2: Transfer B → A  
+Thread 2: Transfer B → A
   - Locks B
   - Tries to lock A (waits)
 
@@ -72,7 +72,7 @@ Result: DEADLOCK! Both threads wait forever.
 ```java
 public LockPair acquireLocks(String accountId1, String accountId2) {
     int comparison = accountId1.compareTo(accountId2);
-    
+
     if (comparison < 0) {
         // accountId1 < accountId2: lock in order (1, 2)
         lock1.lock();
@@ -95,7 +95,7 @@ Thread 1: Transfer A → B
   - Lock A, then B ✓
 
 Thread 2: Transfer B → A
-  - Compare: B > A  
+  - Compare: B > A
   - Lock A, then B ✓ (same order!)
 
 Result: Thread 2 waits for A, then both proceed. NO DEADLOCK.
@@ -160,7 +160,7 @@ Return Result
 ```
 Global Lock:
 - 100K users
-- Each does 1 transfer/minute  
+- Each does 1 transfer/minute
 - = 1,667 transfers/second needed
 - But max throughput = 100/second
 - Result: SYSTEM OVERLOAD ❌
